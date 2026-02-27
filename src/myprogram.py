@@ -337,7 +337,7 @@ class MyModel:
 
     def run_pred(self, data):
         predictions = []
-        print(set(self.engine.freq_by_char.keys()))
+        # print(set(self.engine.freq_by_char.keys()))
         for input_str in data:
             self.engine.clear_context()
             
