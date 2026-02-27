@@ -87,19 +87,26 @@ class Predictor:
     def predict_next(self, num_predictions: int = 3) -> List[str]:
         """
         Predict the next N most likely characters. (in this case 3)
-        """        
+        Uses context backoff: if the current n-gram context is unseen in the trie,
+        try shorter context down to unigram (context_length 0) so we never return
+        arbitrary tie-break (e.g. same 'tid' for every input).
+        """
         possible_chars = set(self.freq_by_char.keys())
         if not possible_chars:
             raise Exception("No characters found")
-        
-        # Calculate probabilities for all possible characters
+
+        max_context_length = min(len(self.context), self.max_context_length)
         probabilities: List[Tuple[float, str]] = []
-        current_context_length = min(len(self.context), self.max_context_length)
-        
-        for char in possible_chars:
-            prob = self.get_char_prob(char, self.context, current_context_length)
-            probabilities.append((prob, char))
-        
+
+        # Backoff: try longest context first; if all probs are 0 (context unseen), use shorter context
+        for context_length in range(max_context_length, -1, -1):
+            probabilities.clear()
+            for char in possible_chars:
+                prob = self.get_char_prob(char, self.context, context_length)
+                probabilities.append((prob, char))
+            if any(p > 0 for p, _ in probabilities):
+                break
+
         # Get top N
         top_n = heapq.nlargest(num_predictions, probabilities, key=lambda x: x[0])
         return [char for _, char in top_n]
@@ -177,7 +184,7 @@ class MyModel:
     def load_test_data(cls, fname):
         # your code here
         data = []
-        with open(fname) as f:
+        with open(fname, encoding='utf-8') as f:
             for line in f:
                 inp = line[:-1]  # the last character is a newline
                 data.append(inp)
