@@ -98,59 +98,7 @@ def main():
     myprogram_path = os.path.join(SCRIPT_DIR, args.src)
     if not os.path.isfile(myprogram_path):
         print(f"Error: myprogram not found at {myprogram_path}", file=sys.stderr)
-        sys.exit(1)
-
-    # Optionally create/train model if missing
-    model_path = os.path.join(work_dir, "ngram_model.pkl")
-    if not os.path.exists(model_path):
-        if args.minimal_model:
-            print("No model found; creating minimal English-only model (no network) ...", file=sys.stderr)
-            create_script = os.path.join(tests_dir, "create_minimal_model.py")
-            ret = subprocess.run(
-                [sys.executable, create_script, work_dir],
-                cwd=SCRIPT_DIR,
-                capture_output=True,
-                timeout=30,
-            )
-            if ret.returncode != 0:
-                print("Creating minimal model failed.", file=sys.stderr)
-                if ret.stdout:
-                    sys.stderr.write(ret.stdout.decode("utf-8", errors="replace"))
-                if ret.stderr:
-                    sys.stderr.write(ret.stderr.decode("utf-8", errors="replace"))
-                sys.exit(1)
-        elif args.train_first:
-            print("No model found; training with dataset_fraction=0.001 ...", file=sys.stderr)
-            train_cmd = [
-                sys.executable,
-                myprogram_path,
-                "train",
-                "--work_dir",
-                work_dir,
-                "--dataset_fraction",
-                "0.001",
-            ]
-            ret = subprocess.run(
-                train_cmd,
-                cwd=SCRIPT_DIR,
-                capture_output=True,
-                timeout=600,
-            )
-            if ret.returncode != 0:
-                print("Training failed.", file=sys.stderr)
-                if ret.stdout:
-                    sys.stderr.write(ret.stdout.decode("utf-8", errors="replace"))
-                if ret.stderr:
-                    sys.stderr.write(ret.stderr.decode("utf-8", errors="replace"))
-                sys.exit(1)
-        else:
-            print(
-                "Error: No model at {}.\n  Use --minimal_model to create a tiny model (no network), or --train_first to train on Wiki40B.".format(
-                    model_path
-                ),
-                file=sys.stderr,
-            )
-            sys.exit(1)
+        sys.exit(1)    
 
     # Run test (predict). If no model exists, myprogram will train; use small fraction then.
     test_cmd = [
@@ -166,8 +114,8 @@ def main():
         "--dataset_fraction",
         "0.001",
     ]
-
     start = time.perf_counter()
+    print("hi8")
     result = subprocess.run(
         test_cmd,
         cwd=SCRIPT_DIR,

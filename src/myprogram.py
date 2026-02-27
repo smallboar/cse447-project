@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 import os
+import re
 import string
 import random
 import sys
@@ -8,17 +9,23 @@ from typing import Dict, List, Tuple, Optional
 from collections import defaultdict
 import pickle
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
-from datasets import load_dataset # import from hugging face
+from datasets import interleave_datasets, load_dataset
+
+
+KN_DISCOUNT = 0.75
 
 class TrieNode:
     """
     This class is responsible for storing data for a trie.
+    Now includes Kneser Ney Smoothing.
     """
 
     def __init__(self) -> None:
         self.children: Dict[str, 'TrieNode'] = {}
         self.counts: Dict[str, int] = defaultdict(int)
         self.total_count: int = 0
+        self.continuation_counts: Dict[str, int] = defaultdict(int)  # kneser ney smoothing
+        self.total_continuations: int = 0  # unique bigrams seen
 
 class Predictor:
     """
@@ -31,83 +38,109 @@ class Predictor:
         self.freq_by_char: Dict[str, int] = defaultdict(int)
         self.total_chars: int = 0
         self.context: List[str] = []
-        
+        self.kn_unigram_counts: Dict[str, int] = defaultdict(int)  # char completion to # unique bigram types
+        self.kn_unigram_total: int = 0
+
     def train(self, text: str) -> None:
         self.total_chars += len(text)
 
+        prev_char: Optional[str] = None
         for char in text:
             self.freq_by_char[char] += 1
-            
-            # Update trie
+
+            if prev_char is not None:  
+                # update kneser ney unigram counts, where we're looking at leftside contexts. 
+                # only done on first time seeing, don't want to overcount.
+                self.kn_unigram_counts[char] += 1
+                self.kn_unigram_total += 1
+
+            # TOUCH THE TRIE :D 
             node = self.trie_root
-            for _, prev_char in enumerate(self.context[-self.max_context_length:]):
-                if prev_char not in node.children:
-                    node.children[prev_char] = TrieNode()
-                node = node.children[prev_char]
+            for prev in self.context[-self.max_context_length:]:
+                if prev not in node.children:
+                    node.children[prev] = TrieNode()
+                node = node.children[prev]
+                # update count of unqiue chars following prefix
+                if node.counts[char] == 0:
+                    node.continuation_counts[char] += 1
+                    node.total_continuations += 1
                 node.counts[char] += 1
                 node.total_count += 1
-            
-            # Update context
+
+            prev_char = char
             self.context.append(char)
             if len(self.context) > self.max_context_length:
                 self.context.pop(0)
-    
+
+    def _kn_unigram_prob(self, char: str) -> float:
+        """
+        Kneser-Ney unigram probability: proportion of unique bigram types char completes.
+        Falls back to raw unigram if no bigram data exists.
+        """
+        if self.kn_unigram_total == 0:
+            # fallback to just the unigram itself if borken
+            return self.freq_by_char.get(char, 0) / max(self.total_chars, 1)
+        return self.kn_unigram_counts.get(char, 0) / self.kn_unigram_total
+
     def get_char_prob(self, char: str, context: List[str], context_length: int) -> float:
         """
-        Calculate probability of character given context of specified context length.
+        get kneser ney probability of next char given the previous context_length num chars
+        in the context
+
+        prob calculated as follows:
+        P(char | context) = max(count(context, char) - D, 0) / count(context)
+                + lambda(context) * P(char | shorter_context)
+
+        where lambda(context) = D * num_unique_followers(context) / count(context)
         """
-
-        # TODO: Implement smoothing as described in the doc (i think we said Kneser-Ney smoothing)
-
-        # Unigram
         if context_length == 0:
-            if self.total_chars == 0:
-                return 0.0 # shouldnt happen but just in case
-            return self.freq_by_char.get(char, 0) / self.total_chars
-        
-        # N-gram
+            return self._kn_unigram_prob(char)
+
+        # use trie to find the node for this context
         node = self.trie_root
         context_start = len(context) - context_length
-
         # Traverse trie
         for i in range(context_start, len(context)):
-            if context[i] not in node.children:
-                return 0.0
-            node = node.children[context[i]]
-        
-        # Calculate prob
-        char_count = node.counts.get(char, 0)
+            ctx_char = context[i]
+            if ctx_char not in node.children:
+                # if can't find context, back off to shorter ver, keep going
+                return self.get_char_prob(char, context, context_length - 1)
+            node = node.children[ctx_char]
+
         total = node.total_count
-        
+
         if total == 0:
-            return 0.0
-        
-        return char_count / total
-    
+            return self.get_char_prob(char, context, context_length - 1)
+
+        count = node.counts.get(char, 0)
+        num_unique_followers = len(node.counts)
+
+        discounted = max(count - KN_DISCOUNT, 0.0) / total  # discount at ngram
+
+        # get interp weight (weight freed from discount)
+        lam = (KN_DISCOUNT * num_unique_followers) / total
+
+        # get lower order probability, recursieve
+        lower_order = self.get_char_prob(char, context, context_length - 1)
+
+        return discounted + lam * lower_order
+
     def predict_next(self, num_predictions: int = 3) -> List[str]:
         """
-        Predict the next N most likely characters. (in this case 3)
-        Uses context backoff: if the current n-gram context is unseen in the trie,
-        try shorter context down to unigram (context_length 0) so we never return
-        arbitrary tie-break (e.g. same 'tid' for every input).
+        get n next most likley chars using kneser ney smoothing.
+        no backoff needed for zero probs bc kneser ney smoothing! :D
         """
         possible_chars = set(self.freq_by_char.keys())
         if not possible_chars:
             raise Exception("No characters found")
 
-        max_context_length = min(len(self.context), self.max_context_length)
-        probabilities: List[Tuple[float, str]] = []
+        context_length = min(len(self.context), self.max_context_length)
 
-        # Backoff: try longest context first; if all probs are 0 (context unseen), use shorter context
-        for context_length in range(max_context_length, -1, -1):
-            probabilities.clear()
-            for char in possible_chars:
-                prob = self.get_char_prob(char, self.context, context_length)
-                probabilities.append((prob, char))
-            if any(p > 0 for p, _ in probabilities):
-                break
+        probabilities: List[Tuple[float, str]] = [
+            (self.get_char_prob(char, self.context, context_length), char)
+            for char in possible_chars
+        ]
 
-        # Get top N
         top_n = heapq.nlargest(num_predictions, probabilities, key=lambda x: x[0])
         return [char for _, char in top_n]
     
@@ -128,8 +161,10 @@ class Predictor:
             'vocab': dict(self.freq_by_char),
             'total_chars': self.total_chars,
             'max_context_length': self.max_context_length,
+            'kn_unigram_counts': dict(self.kn_unigram_counts),
+            'kn_unigram_total': self.kn_unigram_total,
         }
-
+    
         with open(filepath, 'wb') as f:
             pickle.dump(model_data, f)
     
@@ -145,11 +180,13 @@ class Predictor:
 
         if model_data is None:
             raise Exception("Could not load model from filepath: " + filepath)
-        
+
         engine = cls(max_context_length=model_data['max_context_length'])
         engine.trie_root = model_data['root']
         engine.freq_by_char = model_data['vocab']
         engine.total_chars = model_data['total_chars']
+        engine.kn_unigram_counts = defaultdict(int, model_data.get('kn_unigram_counts', {}))
+        engine.kn_unigram_total = model_data.get('kn_unigram_total', 0)
         return engine
 
 
@@ -162,11 +199,23 @@ class MyModel:
     MODEL_FILENAME = 'ngram_model.pkl'
 
     def __init__(self, engine: Optional[Predictor] = None):
-        """Initialize the model with a predictor"""
-        if engine is None:
-            self.engine = Predictor(max_context_length=6)
-        else:
-            self.engine = engine
+        self.engine = engine if engine is not None else Predictor(max_context_length=6)
+
+    @staticmethod
+    def clean_wiki_text(text):
+        if text is None:
+            return None
+
+        if isinstance(text, bytes):
+            text = text.decode("utf-8", errors="ignore")
+
+        text = re.sub(r"_START_[A-Z_]+_", " ", text)
+        text = re.sub(r"_END_[A-Z_]+_", " ", text)
+        text = re.sub(r"\\[a-zA-Z]+", " ", text)
+        text = text.replace("\\", " ")
+        text = re.sub(r"\s+", " ", text).strip()
+
+        return text
 
     @classmethod
     def load_training_data(cls):
@@ -174,10 +223,20 @@ class MyModel:
         Load training data from the Wiki40B dataset
         """
         # Load the Wiki40B dataset
-        # Currently only loading the English dataset for MVP purposes (will add the rest later on)
-        # Looking to add langauges like Russian, Chinese, Spanish, etc... we listed them all in the doc
-        # Stream to avoid loading entire dataset
-        ds = load_dataset("google/wiki40b", "en", split="train", streaming=True)
+        # 40% english, 25% chinese, 25% russian, 5% arabic, 5% spanish
+        ds_en = load_dataset("google/wiki40b", "en", split="train", streaming=True).shuffle(seed=42)
+        ds_ch = load_dataset("google/wiki40b", "zh-cn", split="train", streaming=True).shuffle(seed=42)
+        ds_ru = load_dataset("google/wiki40b", "ru", split="train", streaming=True).shuffle(seed=42)
+        ds_ar = load_dataset("google/wiki40b", "ar", split="train", streaming=True).shuffle(seed=42)
+        ds_es = load_dataset("google/wiki40b", "es", split="train", streaming=True).shuffle(seed=42)
+
+        # Interleave datasets
+        ds = interleave_datasets(
+            [ds_en, ds_ch, ds_ru, ds_ar, ds_es],
+            probabilities=[0.40, 0.25, 0.25, 0.05, 0.05],
+            seed=42,
+        )
+        ds.shuffle()
         return ds
 
     @classmethod
@@ -217,7 +276,7 @@ class MyModel:
         else:
             # Streaming dataset - use a target count based on dataset_fraction
             training_data_len = int(1_000_000 * dataset_fraction)
-            print(f'Using streaming dataset and targeting {training_data_len:,} items)', file=sys.stderr)
+            print(f'Using streaming dataset and targeting {training_data_len:,} items', file=sys.stderr)
         
         # Helper function to train on current batch
         def train_batch():
@@ -246,7 +305,8 @@ class MyModel:
                         break
                     
                     # Hugging face dataset stores it under "text" key
-                    text = item.get('text')
+                    raw_text = item.get('text')
+                    text = self.clean_wiki_text(raw_text)
 
                     if text:
                         current_batch.append(text)
@@ -277,7 +337,7 @@ class MyModel:
 
     def run_pred(self, data):
         predictions = []
-
+        print(set(self.engine.freq_by_char.keys()))
         for input_str in data:
             self.engine.clear_context()
             
@@ -296,10 +356,9 @@ class MyModel:
                 for c in common_chars:
                     if c not in next_predictions:
                         next_predictions.append(c)
-                        if len(next_predictions) == MyModel.NUM_PREDICTIONS:
-                            break
-            
-            # Join to one str
+                    if len(next_predictions) == MyModel.NUM_PREDICTIONS:
+                        break
+
             predictions.append(''.join(next_predictions[:MyModel.NUM_PREDICTIONS]))
         
         return predictions

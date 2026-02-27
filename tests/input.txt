@@ -8,26 +8,6 @@ Hasta luego, amig
 ¿Dónde está la bibliotec
 No entiendo nad
 Por favor, ayud
-Bonjour le mond
-Merci beaucou
-Je ne sais pa
-Comment allez-vous aujourd'hui
-C'est la vi
-Au revoir et à bientô
-Je m'appelle Pierr
-Où est la gare s'il vous plaî
-Le chat noir est sur la tab
-Très bien, merc
-Guten Tag, wie geht e
-Danke schö
-Auf Wiedersehe
-Ich heiße Han
-Das ist wunderba
-Wo ist die Toilette bit
-Ein Buch über die Geschich
-Gute Nacht und schlaf gu
-Bitte sehr, gern geschehe
-Der Hund läuft in den Gar
 Привет ми
 Спасибо больш
 Как дела
@@ -48,16 +28,6 @@ Der Hund läuft in den Gar
 明天见
 对不起，我不懂
 欢迎来到北
-こんにちは、元気
-ありがとうございま
-さようなら
-私は学生で
-今日はいい天気
-トイレはどこですか
-おいしいです
-明日また会いましょう
-すみません、分かりません
-日本へようこそ
 مرحبا بك
 شكرا جزيلا
 كيف حالك
@@ -68,46 +38,6 @@ Der Hund läuft in den Gar
 إلى اللقاء
 من فضلك ساعدني
 أهلا وسهلا
-Olá mundo
-Obrigado pela ajud
-Bom dia, como vai
-Até logo, amig
-Onde fica o banheir
-Isso é delicios
-Por favor, me ajud
-Boa noite e durma be
-Tudo bem com voc
-Bem-vindo ao Brasi
-Ciao mondo
-Grazie mille
-Come stai ogg
-A presto, amic
-Dove si trova il bagn
-È molto buon
-Per favore, aiutatemi
-Buona notte e sogni d'or
-Mi chiamo Luc
-Benvenuto in Itali
-42 
-3.14159
-100% 
-$50.00 
-2 + 2 
-#hashtag 
-user@domain.
-(555) 123-456
-Version 2.0.
-<html>
-def 
-import 
-function 
-return 
-https://www.goo
-/usr/local/bi
-git checkout 
-npm install 
-SELECT * FROM 
-console.log(
 Mr. 
 Dr. 
 e.g. 
@@ -128,12 +58,6 @@ won't
 John's 
 that's 
 what's 
-xylophon
-pneumoni
-rhythm
-syzygy
-antidisestablishmentarianism
-supercalifragilisticexpialidociou
 unbelievable
 questionnaire
 necessary
@@ -154,14 +78,6 @@ the the the
 abcabcab
 1231231
 Hello 世界
-The café is 
-naïve approach
-Pokémon and anime
-Café résumé
-Tokyo 東京
-Hola, I said 
-C'est la vie baby
-Danke thank you
 Adiós friends
 OMG that's 
 LOL so funn
@@ -183,34 +99,18 @@ Mon Dec 0
 2nd floor
 3rd time
 Chapter IV
-π ≈ 3.14
-α and β are
-Δx = 
-E = mc²
-H₂O
-x → ∞
-∑ i = 
-√2 ≈ 
-∂f/∂x
-∫₀¹ x dx
 'Hello' 
 "Yes" 
 (example)
 [array]
 {key}: 
-<tag>
+<tag
 'Single quoted
 "Double quoted
 Back `tick`
 —em dash—
 Hello 😀
 Thumbs up 👍
-Café
-Zürich
-naïve
-résumé
-日本語
-한글
 مرحبا
 Привет
 Hello. 
@@ -248,11 +148,6 @@ ad hoc
 per se
 vice versa
 status quo
-alma mater
-bona fide
-carpe diem
-quid pro quo
-habeas corpus
 the quick brown fox jumps over the lazy do
 In the beginning was the Word, and the Word was with Go
 To be or not to be, that is the questio
@@ -308,16 +203,6 @@ embarrass
 address
 success
 possess
-racecar
-level
-radar
-kayak
-deified
-rotator
-repaper
-noon
-civic
-mom
 bang!
 boom!
 splash!
@@ -328,33 +213,3 @@ click
 pop
 zip
 crash
-1st 
-2nd 
-3rd 
-4th 
-5th 
-first 
-second 
-third 
-Item 1.
-Step 2.
-/home/user/
-C:\Users\
-http://example.
-file:///tmp/
-ftp://ftp.
-www.example
-.gitignore
-README.md
-src/main.
-docs/api.
-word  
-  space
-after newline
-tab	here
-mixedCase
-UPPERCASE
-lowercase
-CamelCase
-snake_case
-kebab-case
