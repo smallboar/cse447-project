@@ -67,6 +67,22 @@ python grader/grade.py example/pred.txt example/answer.txt --verbose
 
 You should see a detailed answer, as well as a success rate.
 
+## Unit tests
+
+A large suite of unit tests (360 cases) exercises next-character prediction on diverse inputs: multiple languages (Spanish, French, German, Russian, Chinese, Japanese, Arabic, etc.), code/URLs, punctuation, contractions, rare words, and edge cases. The model is English-only, so accuracy on this suite is expected to be low (~10% or less).
+
+**Single script to run all unit tests** (from project root):
+
+```bash
+# If you have a trained model in work/:
+python run_unit_tests.py
+
+# Or use a minimal English-only model (create once, then run tests):
+python tests/create_minimal_model.py work_unit_tests
+python run_unit_tests.py --work_dir work_unit_tests
+```
+
+The script prints each failing case (input snippet, expected next char, model’s top-3), then **overall accuracy %** and **runtime in seconds**.
 
 # Submitting your project
 
